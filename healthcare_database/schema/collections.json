@@ -1,0 +1,270 @@
+{
+  "database": "myapp",
+  "connection_info": {
+    "url": "mongodb://appuser:dbuser123@localhost:5000/?authSource=admin",
+    "db": "myapp"
+  },
+  "collections": [
+    {
+      "name": "users",
+      "description": "Stores authentication credentials and role for all users of the system, including patients, doctors, and admins.",
+      "fields": {
+        "_id": { "type": "ObjectId", "generated": true, "description": "Primary identifier" },
+        "email": { "type": "string", "required": true, "unique": true, "format": "email", "description": "Unique email address used for login" },
+        "password_hash": { "type": "string", "required": true, "description": "Hashed password (never store plaintext)" },
+        "role": { "type": "string", "required": true, "enum": ["patient", "doctor", "admin"], "description": "Role of the user" },
+        "created_at": { "type": "date", "required": true, "default": "now", "description": "Creation timestamp" }
+      },
+      "validation": {
+        "$jsonSchema": {
+          "bsonType": "object",
+          "required": ["email", "password_hash", "role", "created_at"],
+          "properties": {
+            "email": { "bsonType": "string", "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" },
+            "password_hash": { "bsonType": "string", "minLength": 20 },
+            "role": { "enum": ["patient", "doctor", "admin"] },
+            "created_at": { "bsonType": "date" }
+          }
+        }
+      },
+      "indexes": [
+        { "name": "uniq_email", "keys": { "email": 1 }, "options": { "unique": true }, "description": "Ensure email is unique" },
+        { "name": "role_idx", "keys": { "role": 1 }, "options": {}, "description": "Filter users by role" },
+        { "name": "created_at_idx", "keys": { "created_at": -1 }, "options": {}, "description": "Sort by created date" }
+      ]
+    },
+    {
+      "name": "patients",
+      "description": "Profile and demographics for patient users. One-to-one with users by user_id.",
+      "fields": {
+        "_id": { "type": "ObjectId", "generated": true, "description": "Primary identifier" },
+        "user_id": { "type": "ObjectId", "required": true, "unique": true, "ref": "users", "description": "Reference to users._id; one-to-one" },
+        "full_name": { "type": "string", "required": true, "description": "Patient full legal name" },
+        "dob": { "type": "date", "required": true, "description": "Date of birth" },
+        "gender": { "type": "string", "required": false, "enum": ["male", "female", "other", "unspecified"], "description": "Gender" },
+        "contact_info": {
+          "type": "object",
+          "required": false,
+          "description": "Contact details",
+          "properties": {
+            "phone": { "type": "string" },
+            "email": { "type": "string" },
+            "address": { "type": "string" }
+          }
+        },
+        "medical_history": { "type": "array", "items": { "type": "string" }, "required": false, "description": "Optional list of historical conditions or notes" },
+        "created_at": { "type": "date", "required": true, "default": "now", "description": "Creation timestamp" },
+        "updated_at": { "type": "date", "required": true, "default": "now", "description": "Last update timestamp" }
+      },
+      "validation": {
+        "$jsonSchema": {
+          "bsonType": "object",
+          "required": ["user_id", "full_name", "dob", "created_at", "updated_at"],
+          "properties": {
+            "user_id": { "bsonType": "objectId" },
+            "full_name": { "bsonType": "string", "minLength": 1 },
+            "dob": { "bsonType": "date" },
+            "gender": { "enum": ["male", "female", "other", "unspecified"] },
+            "contact_info": {
+              "bsonType": "object",
+              "properties": {
+                "phone": { "bsonType": "string" },
+                "email": { "bsonType": "string" },
+                "address": { "bsonType": "string" }
+              }
+            },
+            "medical_history": { "bsonType": "array", "items": { "bsonType": "string" } },
+            "created_at": { "bsonType": "date" },
+            "updated_at": { "bsonType": "date" }
+          }
+        }
+      },
+      "indexes": [
+        { "name": "uniq_user_id", "keys": { "user_id": 1 }, "options": { "unique": true }, "description": "One patient per user" },
+        { "name": "name_text_idx", "keys": { "full_name": "text" }, "options": {}, "description": "Search by patient name" },
+        { "name": "dob_idx", "keys": { "dob": 1 }, "options": {}, "description": "Filter by date of birth" }
+      ]
+    },
+    {
+      "name": "doctors",
+      "description": "Profile and professional information for doctor users. One-to-one with users by user_id.",
+      "fields": {
+        "_id": { "type": "ObjectId", "generated": true, "description": "Primary identifier" },
+        "user_id": { "type": "ObjectId", "required": true, "unique": true, "ref": "users", "description": "Reference to users._id; one-to-one" },
+        "full_name": { "type": "string", "required": true, "description": "Doctor full legal name" },
+        "specialization": { "type": "string", "required": true, "description": "Medical specialty (e.g., cardiology)" },
+        "license_no": { "type": "string", "required": true, "unique": true, "description": "Medical license number" },
+        "availability": {
+          "type": "array",
+          "required": false,
+          "description": "Available timeslots",
+          "items": {
+            "type": "object",
+            "properties": {
+              "day": { "type": "string", "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] },
+              "slots": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "start": { "type": "string", "description": "ISO 8601 time or datetime" },
+                    "end": { "type": "string", "description": "ISO 8601 time or datetime" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "created_at": { "type": "date", "required": true, "default": "now", "description": "Creation timestamp" },
+        "updated_at": { "type": "date", "required": true, "default": "now", "description": "Last update timestamp" }
+      },
+      "validation": {
+        "$jsonSchema": {
+          "bsonType": "object",
+          "required": ["user_id", "full_name", "specialization", "license_no", "created_at", "updated_at"],
+          "properties": {
+            "user_id": { "bsonType": "objectId" },
+            "full_name": { "bsonType": "string", "minLength": 1 },
+            "specialization": { "bsonType": "string", "minLength": 1 },
+            "license_no": { "bsonType": "string", "minLength": 1 },
+            "availability": {
+              "bsonType": "array",
+              "items": {
+                "bsonType": "object",
+                "properties": {
+                  "day": { "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] },
+                  "slots": { "bsonType": "array" }
+                }
+              }
+            },
+            "created_at": { "bsonType": "date" },
+            "updated_at": { "bsonType": "date" }
+          }
+        }
+      },
+      "indexes": [
+        { "name": "uniq_user_id", "keys": { "user_id": 1 }, "options": { "unique": true }, "description": "One doctor per user" },
+        { "name": "uniq_license_no", "keys": { "license_no": 1 }, "options": { "unique": true }, "description": "Prevent duplicate license numbers" },
+        { "name": "specialization_idx", "keys": { "specialization": 1 }, "options": {}, "description": "Filter doctors by specialty" }
+      ]
+    },
+    {
+      "name": "consultations",
+      "description": "Represents scheduled and completed consultations between patients and doctors.",
+      "fields": {
+        "_id": { "type": "ObjectId", "generated": true, "description": "Primary identifier" },
+        "patient_id": { "type": "ObjectId", "required": true, "ref": "patients", "description": "Reference to patients._id" },
+        "doctor_id": { "type": "ObjectId", "required": true, "ref": "doctors", "description": "Reference to doctors._id" },
+        "scheduled_at": { "type": "date", "required": true, "description": "Scheduled date/time of consultation" },
+        "status": { "type": "string", "required": true, "enum": ["scheduled", "completed", "cancelled"], "description": "Current status" },
+        "notes": { "type": "string", "required": false, "description": "Consultation notes" },
+        "prescriptions": {
+          "type": "array",
+          "required": false,
+          "description": "List of prescribed medications",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "dosage": { "type": "string" },
+              "instructions": { "type": "string" }
+            }
+          }
+        },
+        "created_at": { "type": "date", "required": true, "default": "now", "description": "Creation timestamp" },
+        "updated_at": { "type": "date", "required": true, "default": "now", "description": "Last update timestamp" }
+      },
+      "validation": {
+        "$jsonSchema": {
+          "bsonType": "object",
+          "required": ["patient_id", "doctor_id", "scheduled_at", "status", "created_at", "updated_at"],
+          "properties": {
+            "patient_id": { "bsonType": "objectId" },
+            "doctor_id": { "bsonType": "objectId" },
+            "scheduled_at": { "bsonType": "date" },
+            "status": { "enum": ["scheduled", "completed", "cancelled"] },
+            "notes": { "bsonType": "string" },
+            "prescriptions": {
+              "bsonType": "array",
+              "items": {
+                "bsonType": "object",
+                "properties": {
+                  "name": { "bsonType": "string" },
+                  "dosage": { "bsonType": "string" },
+                  "instructions": { "bsonType": "string" }
+                }
+              }
+            },
+            "created_at": { "bsonType": "date" },
+            "updated_at": { "bsonType": "date" }
+          }
+        }
+      },
+      "indexes": [
+        { "name": "patient_schedule_idx", "keys": { "patient_id": 1, "scheduled_at": -1 }, "options": {}, "description": "List consultations per patient by recency" },
+        { "name": "doctor_schedule_idx", "keys": { "doctor_id": 1, "scheduled_at": -1 }, "options": {}, "description": "List consultations per doctor by recency" },
+        { "name": "status_idx", "keys": { "status": 1 }, "options": {}, "description": "Filter by consultation status" }
+      ]
+    },
+    {
+      "name": "medical_records",
+      "description": "Stores patient documents and clinical records such as lab results, imaging, or uploaded files.",
+      "fields": {
+        "_id": { "type": "ObjectId", "generated": true, "description": "Primary identifier" },
+        "patient_id": { "type": "ObjectId", "required": true, "ref": "patients", "description": "Reference to patients._id" },
+        "title": { "type": "string", "required": true, "description": "Record title" },
+        "description": { "type": "string", "required": false, "description": "Detailed description or summary" },
+        "attachments": {
+          "type": "array",
+          "required": false,
+          "description": "Files related to the record",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "type": { "type": "string", "description": "MIME type" },
+              "size": { "type": "number", "description": "File size in bytes" }
+            }
+          }
+        },
+        "created_at": { "type": "date", "required": true, "default": "now", "description": "Creation timestamp" },
+        "updated_at": { "type": "date", "required": true, "default": "now", "description": "Last update timestamp" }
+      },
+      "validation": {
+        "$jsonSchema": {
+          "bsonType": "object",
+          "required": ["patient_id", "title", "created_at", "updated_at"],
+          "properties": {
+            "patient_id": { "bsonType": "objectId" },
+            "title": { "bsonType": "string", "minLength": 1 },
+            "description": { "bsonType": "string" },
+            "attachments": {
+              "bsonType": "array",
+              "items": {
+                "bsonType": "object",
+                "properties": {
+                  "name": { "bsonType": "string" },
+                  "url": { "bsonType": "string" },
+                  "type": { "bsonType": "string" },
+                  "size": { "bsonType": "number" }
+                }
+              }
+            },
+            "created_at": { "bsonType": "date" },
+            "updated_at": { "bsonType": "date" }
+          }
+        }
+      },
+      "indexes": [
+        { "name": "patient_created_idx", "keys": { "patient_id": 1, "created_at": -1 }, "options": {}, "description": "Fetch latest records for a patient" },
+        { "name": "title_description_text_idx", "keys": { "title": "text", "description": "text" }, "options": {}, "description": "Text search over titles and descriptions" }
+      ]
+    }
+  ],
+  "notes": [
+    "This file documents intended collection structures, validation schemas, and indexes for the MongoDB database.",
+    "To enforce these rules in MongoDB, apply the $jsonSchema validators and create indexes during initialization or via a migration script.",
+    "Object references are logical; MongoDB does not enforce foreign keys natively."
+  ]
+}
