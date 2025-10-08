@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# MongoDB startup script for port 5001 (preview mode)
+# MongoDB startup script for port 27017 (preview mode)
 # Ensures MongoDB starts reliably and visualizer failures don't affect MongoDB
 DB_NAME="${DB_NAME:-myapp}"
 DB_USER="${DB_USER:-appuser}"
 DB_PASSWORD="${DB_PASSWORD:-dbuser123}"
-DB_PORT="${DB_PORT:-5001}"
+DB_PORT="${DB_PORT:-27017}"
 DB_HOST="0.0.0.0"
 
 echo "════════════════════════════════════════════════════════"

@@ -48,7 +48,7 @@ else
 fi
 
 echo ""
-echo "Acceptance Criteria 2: mongod listens on port 5001 (0.0.0.0:5001) and responds to ping"
+echo "Acceptance Criteria 2: mongod listens on port 27017 (0.0.0.0:27017) and responds to ping"
 echo "─────────────────────────────────────────────────────────"
 
 # Test 2a: Check if mongod is running
@@ -58,25 +58,25 @@ else
     test_fail "mongod process not found"
 fi
 
-# Test 2b: Check port binding to 0.0.0.0:5001
-if ss -tlnp 2>/dev/null | grep -q "0.0.0.0:5001"; then
-    test_pass "mongod listening on 0.0.0.0:5001"
+# Test 2b: Check port binding to 0.0.0.0:27017
+if ss -tlnp 2>/dev/null | grep -q "0.0.0.0:27017"; then
+    test_pass "mongod listening on 0.0.0.0:27017"
 else
-    test_fail "mongod not listening on 0.0.0.0:5001"
+    test_fail "mongod not listening on 0.0.0.0:27017"
 fi
 
 # Test 2c: Verify MongoDB responds to ping
-if mongosh --port 5001 --quiet --eval "db.adminCommand('ping')" 2>/dev/null | grep -q "ok: 1"; then
+if mongosh --port 27017 --quiet --eval "db.adminCommand('ping')" 2>/dev/null | grep -q "ok: 1"; then
     test_pass "MongoDB responds to ping command"
 else
     test_fail "MongoDB does not respond to ping"
 fi
 
 # Test 2d: Verify TCP connectivity
-if (echo > /dev/tcp/127.0.0.1/5001) >/dev/null 2>&1; then
-    test_pass "Port 5001 accepts TCP connections"
+if (echo > /dev/tcp/127.0.0.1/27017) >/dev/null 2>&1; then
+    test_pass "Port 27017 accepts TCP connections"
 else
-    test_fail "Port 5001 does not accept TCP connections"
+    test_fail "Port 27017 does not accept TCP connections"
 fi
 
 echo ""
@@ -91,7 +91,7 @@ else
 fi
 
 # Test 3b: Health check returns success when MongoDB is ready
-HEALTH_RESULT=$(bash healthcheck.sh 5001 2>/dev/null)
+HEALTH_RESULT=$(bash healthcheck.sh 27017 2>/dev/null)
 HEALTH_EXIT=$?
 if [ $HEALTH_EXIT -eq 0 ]; then
     test_pass "Health check returns success (exit 0)"
@@ -117,7 +117,7 @@ fi
 # Test 3e: Health check is resilient (works even with visualizer down)
 pkill -f "node.*server.js" 2>/dev/null
 sleep 1
-if bash healthcheck.sh 5001 >/dev/null 2>&1; then
+if bash healthcheck.sh 27017 >/dev/null 2>&1; then
     test_pass "Health check succeeds even when visualizer is down"
 else
     test_fail "Health check fails when visualizer is down"
@@ -182,7 +182,7 @@ else
 fi
 
 # Test 7: MongoDB configuration file is valid
-if [ -f "mongod.conf" ] && grep -q "port: 5001" mongod.conf && grep -q "bindIp: 0.0.0.0" mongod.conf; then
+if [ -f "mongod.conf" ] && grep -q "port: 27017" mongod.conf && grep -q "bindIp: 0.0.0.0" mongod.conf; then
     test_pass "MongoDB configuration is valid"
 else
     test_fail "MongoDB configuration is invalid or missing"
@@ -227,7 +227,7 @@ if [ "$FAIL_COUNT" -eq 0 ]; then
     echo ""
     echo "MongoDB startup is stable and resilient:"
     echo "  • Survives visualizer failures"
-    echo "  • Binds correctly to 0.0.0.0:5001"
+    echo "  • Binds correctly to 0.0.0.0:27017"
     echo "  • Health checks are reliable with fallbacks"
     echo "  • Clear error messages with actionable hints"
     echo ""

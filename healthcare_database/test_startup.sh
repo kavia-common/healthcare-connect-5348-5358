@@ -18,21 +18,21 @@ fi
 
 # Test 2: Check port binding
 echo ""
-echo "Test 2: Port 5001 Binding"
+echo "Test 2: Port 27017 Binding"
 echo "─────────────────────────────────────────"
-if ss -tlnp 2>/dev/null | grep -q ":5001 "; then
-    echo "✓ Port 5001 is bound and listening"
-    ss -tlnp 2>/dev/null | grep ":5001 "
+if ss -tlnp 2>/dev/null | grep -q ":27017 "; then
+    echo "✓ Port 27017 is bound and listening"
+    ss -tlnp 2>/dev/null | grep ":27017 "
 else
-    echo "✗ Port 5001 is not bound"
+    echo "✗ Port 27017 is not bound"
 fi
 
-# Test 3: Health check script
+# Test 3: Health Check Script
 echo ""
 echo "Test 3: Health Check Script"
 echo "─────────────────────────────────────────"
 if [ -f "healthcheck.sh" ]; then
-    result=$(./healthcheck.sh 5001)
+    result=$(./healthcheck.sh 27017)
     if [ $? -eq 0 ]; then
         echo "✓ Health check passed: ${result}"
     else
@@ -47,9 +47,9 @@ echo ""
 echo "Test 4: MongoDB Connectivity"
 echo "─────────────────────────────────────────"
 if command -v mongosh >/dev/null 2>&1; then
-    if mongosh --port 5001 --quiet --eval "db.adminCommand('ping')" >/dev/null 2>&1; then
+    if mongosh --port 27017 --quiet --eval "db.adminCommand('ping')" >/dev/null 2>&1; then
         echo "✓ MongoDB responds to ping command"
-        mongosh --port 5001 --quiet --eval "print('Server version: ' + db.version())"
+        mongosh --port 27017 --quiet --eval "print('Server version: ' + db.version())"
     else
         echo "✗ MongoDB does not respond to ping"
     fi

@@ -2,7 +2,7 @@
 
 ## Summary
 
-This document describes the fixes applied to stabilize MongoDB startup on port 5001 and ensure resilient health checks. All acceptance criteria have been met.
+This document describes the fixes applied to stabilize MongoDB startup on port 27017 and ensure resilient health checks. All acceptance criteria have been met.
 
 ## Issues Addressed
 
@@ -25,7 +25,7 @@ This document describes the fixes applied to stabilize MongoDB startup on port 5
 - Graceful fallback with warning messages if visualizer fails
 
 ### 3. **MongoDB Port Binding Verification**
-**Problem:** Limited verification that mongod actually binds to 0.0.0.0:5001.
+**Problem:** Limited verification that mongod actually binds to 0.0.0.0:27017.
 
 **Solution:**
 - Multi-method readiness check: mongosh ping, TCP connection, socket status
@@ -43,7 +43,7 @@ This document describes the fixes applied to stabilize MongoDB startup on port 5
 - Clear error messages if directory operations fail
 
 ### 5. **Stale Process Cleanup**
-**Problem:** Lingering mongod processes could block port 5001.
+**Problem:** Lingering mongod processes could block port 27017.
 
 **Solution:**
 - Check for existing mongod processes before starting
@@ -83,9 +83,9 @@ This document describes the fixes applied to stabilize MongoDB startup on port 5
 - Verified: Visualizer runs in background, errors don't affect exit code
 - MongoDB continues running regardless of visualizer state
 
-✅ **mongod listens on port 5001 (0.0.0.0:5001) and responds to ping**
-- Verified: `ss -tlnp` shows `0.0.0.0:5001` in LISTEN state
-- `mongosh --port 5001 --eval "db.adminCommand('ping')"` returns `{ ok: 1 }`
+✅ **mongod listens on port 27017 (0.0.0.0:27017) and responds to ping**
+- Verified: `ss -tlnp` shows `0.0.0.0:27017` in LISTEN state
+- `mongosh --port 27017 --eval "db.adminCommand('ping')"` returns `{ ok: 1 }`
 
 ✅ **Health check reliably detects readiness**
 - Verified: 5 fallback methods ensure detection in various scenarios
@@ -167,13 +167,13 @@ bash startup.sh
 
 ### Health Check
 ```bash
-bash healthcheck.sh 5001
+bash healthcheck.sh 27017
 # Returns: ok (if ready) or not ready (if not ready)
 ```
 
 ### Debug Mode
 ```bash
-DEBUG=true bash healthcheck.sh 5001
+DEBUG=true bash healthcheck.sh 27017
 ```
 
 ### Run Tests
@@ -185,12 +185,12 @@ bash test_startup.sh
 
 **Connection String (no auth):**
 ```
-mongodb://localhost:5001/myapp
+mongodb://localhost:27017/myapp
 ```
 
 **Using mongosh:**
 ```bash
-mongosh mongodb://localhost:5001/myapp
+mongosh mongodb://localhost:27017/myapp
 ```
 
 **From db_connection.txt:**
@@ -207,7 +207,7 @@ The startup script respects the following environment variables:
 | `DB_NAME` | `myapp` | Database name |
 | `DB_USER` | `appuser` | Admin username (when auth enabled) |
 | `DB_PASSWORD` | `dbuser123` | Admin password (when auth enabled) |
-| `DB_PORT` | `5001` | MongoDB port |
+| `DB_PORT` | `27017` | MongoDB port |
 | `ENABLE_AUTH` | `false` | Enable authentication (set to `true` for production) |
 
 ## Troubleshooting
@@ -216,7 +216,7 @@ The startup script respects the following environment variables:
 
 1. **Check if port is in use:**
    ```bash
-   ss -tlnp | grep 5001
+   ss -tlnp | grep 27017
    ```
 
 2. **Check for existing mongod processes:**
@@ -240,13 +240,13 @@ The startup script respects the following environment variables:
 
 1. **Enable debug mode:**
    ```bash
-   DEBUG=true bash healthcheck.sh 5001
+   DEBUG=true bash healthcheck.sh 27017
    ```
 
 2. **Test manually:**
    ```bash
-   mongosh --port 5001 --eval "db.adminCommand('ping')"
-   echo > /dev/tcp/127.0.0.1/5001 && echo "TCP OK"
+   mongosh --port 27017 --eval "db.adminCommand('ping')"
+   echo > /dev/tcp/127.0.0.1/27017 && echo "TCP OK"
    ```
 
 ### Visualizer not starting

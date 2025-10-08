@@ -6,14 +6,14 @@
 # Is MongoDB running?
 ps aux | grep mongod | grep -v grep
 
-# Is port 5001 listening?
-ss -tlnp | grep 5001
+# Is port 27017 listening?
+ss -tlnp | grep 27017
 
 # Can MongoDB respond?
-mongosh --port 5001 --eval "db.adminCommand('ping')"
+mongosh --port 27017 --eval "db.adminCommand('ping')"
 
 # Run full health check
-bash healthcheck.sh 5001
+bash healthcheck.sh 27017
 ```
 
 ## Common Operations
@@ -27,7 +27,7 @@ bash startup.sh
 ### Stop MongoDB
 ```bash
 # Graceful shutdown
-mongosh --port 5001 --eval "db.adminCommand('shutdown')"
+mongosh --port 27017 --eval "db.adminCommand('shutdown')"
 
 # Force stop (if needed)
 pkill -x mongod
@@ -58,21 +58,21 @@ sudo grep -i error /var/lib/mongodb/mongod.log
 $(cat db_connection.txt)
 
 # Direct connection
-mongosh mongodb://localhost:5001/myapp
+mongosh mongodb://localhost:27017/myapp
 
 # List databases
-mongosh --port 5001 --eval "show dbs"
+mongosh --port 27017 --eval "show dbs"
 
 # List collections
-mongosh --port 5001 --eval "use myapp; show collections"
+mongosh --port 27017 --eval "use myapp; show collections"
 ```
 
 ## Troubleshooting Commands
 
 ### Port Already in Use
 ```bash
-# Find what's using port 5001
-lsof -i :5001
+# Find what's using port 27017
+lsof -i :27017
 
 # Stop the process
 pkill -x mongod
@@ -114,12 +114,12 @@ mongosh --version
 
 ### Development (No Auth)
 ```
-mongodb://localhost:5001/myapp
+mongodb://localhost:27017/myapp
 ```
 
 ### Production (With Auth)
 ```
-mongodb://appuser:dbuser123@localhost:5001/myapp?authSource=admin
+mongodb://appuser:dbuser123@localhost:27017/myapp?authSource=admin
 ```
 
 ## Key Files

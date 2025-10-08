@@ -1,10 +1,10 @@
 #!/bin/bash
 # PUBLIC_INTERFACE
-# Health check for MongoDB readiness on port 5001.
+# Health check for MongoDB readiness on port 27017.
 # Uses multiple fallback methods to reliably detect MongoDB availability.
 # Returns 0 on success, non-zero otherwise.
 
-PORT="${1:-5001}"
+PORT="${1:-27017}"
 HOST="${2:-127.0.0.1}"
 
 # Silent mode - don't output unless debugging

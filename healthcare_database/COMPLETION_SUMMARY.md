@@ -1,18 +1,18 @@
 # MongoDB Startup Stabilization - Completion Summary
 
 **Date:** 2024-10-08  
-**Task:** Diagnose and stabilize MongoDB startup on port 5001  
+**Task:** Diagnose and stabilize MongoDB startup on port 27017  
 **Status:** ✅ COMPLETE - All acceptance criteria met
 
 ---
 
 ## Executive Summary
 
-Successfully stabilized MongoDB startup on port 5001 with resilient health checks and graceful visualizer failure handling. All 23 validation tests passed, confirming robust operation under various failure scenarios.
+Successfully stabilized MongoDB startup on port 27017 with resilient health checks and graceful visualizer failure handling. All 23 validation tests passed, confirming robust operation under various failure scenarios.
 
 ### Key Achievements
 
-✅ **MongoDB Reliability:** Starts consistently on 0.0.0.0:5001 and responds to ping  
+✅ **MongoDB Reliability:** Starts consistently on 0.0.0.0:27017 and responds to ping  
 ✅ **Resilient Health Checks:** 5+ fallback detection methods ensure reliability  
 ✅ **Visualizer Isolation:** MongoDB continues running even if visualizer fails  
 ✅ **Clear Error Messaging:** Actionable troubleshooting hints on failure  
@@ -137,22 +137,22 @@ Successfully stabilized MongoDB startup on port 5001 with resilient health check
 - Error handling wrapper around visualizer startup
 - Final `exit 0` ensures success regardless of visualizer state
 
-### ✅ Criterion 2: mongod listens on port 5001 (0.0.0.0:5001) and responds to ping
+### ✅ Criterion 2: mongod listens on port 27017 (0.0.0.0:27017) and responds to ping
 
 **Validation Results:**
 ```
 ✓ mongod process is running (PID 524)
-✓ mongod listening on 0.0.0.0:5001
+✓ mongod listening on 0.0.0.0:27017
 ✓ MongoDB responds to ping command { ok: 1 }
-✓ Port 5001 accepts TCP connections
+✓ Port 27017 accepts TCP connections
 ```
 
 **Evidence:**
 ```bash
-$ ss -tlnp | grep 5001
-LISTEN 0 4096 0.0.0.0:5001 0.0.0.0:*
+$ ss -tlnp | grep 27017
+LISTEN 0 4096 0.0.0.0:27017 0.0.0.0:*
 
-$ mongosh --port 5001 --eval "db.adminCommand('ping')"
+$ mongosh --port 27017 --eval "db.adminCommand('ping')"
 { ok: 1 }
 ```
 
@@ -194,10 +194,10 @@ ok  # MongoDB still healthy
 
 **Example Error Output:**
 ```
-[startup 07:30:15] ERROR: MongoDB failed to start on port 5001 after 60 seconds
+[startup 07:30:15] ERROR: MongoDB failed to start on port 27017 after 60 seconds
 [startup 07:30:15] ERROR: ─────────────────────────────────────────
 [startup 07:30:15] ERROR: Troubleshooting hints:
-[startup 07:30:15] ERROR:   1. Check if port 5001 is already in use: ss -tlnp | grep 5001
+[startup 07:30:15] ERROR:   1. Check if port 27017 is already in use: ss -tlnp | grep 27017
 [startup 07:30:15] ERROR:   2. Verify /var/lib/mongodb permissions: ls -la /var/lib/mongodb
 [startup 07:30:15] ERROR:   3. Check logs: tail -100 /var/lib/mongodb/mongod.log
 [startup 07:30:15] ERROR:   4. Ensure mongod binary is available: which mongod
@@ -259,7 +259,7 @@ ok  # MongoDB still healthy
 - **mongod Memory:** ~182 MB RSS
 - **CPU Usage:** ~0.5% (idle)
 - **Connections:** 8 current, 811 available
-- **Port Binding:** 0.0.0.0:5001 (all interfaces)
+- **Port Binding:** 0.0.0.0:27017 (all interfaces)
 
 ### Reliability Features
 - ✅ Stale lock cleanup (mongod.lock, *.pid)
@@ -281,7 +281,7 @@ bash startup.sh
 
 ### Health Check
 ```bash
-bash healthcheck.sh 5001
+bash healthcheck.sh 27017
 ```
 
 ### Run Tests
@@ -300,7 +300,7 @@ bash validate_acceptance_criteria.sh
 $(cat db_connection.txt)
 
 # Direct connection
-mongosh mongodb://localhost:5001/myapp
+mongosh mongodb://localhost:27017/myapp
 ```
 
 ---
@@ -327,7 +327,7 @@ MongoDB startup has been successfully stabilized with comprehensive error handli
 - **Complete Documentation:** 3 new documentation files
 
 ### Production Readiness
-✅ MongoDB starts reliably on 0.0.0.0:5001  
+✅ MongoDB starts reliably on 0.0.0.0:27017  
 ✅ Health checks work in all scenarios  
 ✅ Error messages guide troubleshooting  
 ✅ Visualizer failures are isolated  

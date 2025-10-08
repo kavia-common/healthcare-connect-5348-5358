@@ -114,12 +114,12 @@ The database is initialized with the following demo users for testing:
 
 **Connection String:** 
 ```
-mongodb://appuser:dbuser123@localhost:5001/myapp?authSource=admin
+mongodb://appuser:dbuser123@localhost:27017/myapp?authSource=admin
 ```
 
 **Database Name:** `myapp`
 
-**Port:** 5001
+**Port:** 27017
 
 **Credentials:**
 - Username: `appuser`
@@ -131,7 +131,7 @@ mongodb://appuser:dbuser123@localhost:5001/myapp?authSource=admin
 The backend API uses the following environment variables to connect:
 
 ```bash
-MONGO_URI=mongodb://appuser:dbuser123@localhost:5001/myapp?authSource=admin
+MONGO_URI=mongodb://appuser:dbuser123@localhost:27017/myapp?authSource=admin
 MONGO_DB=myapp
 ```
 
@@ -154,20 +154,20 @@ MONGO_DB=myapp
 #### Using MongoDB Shell (mongosh)
 
 ```bash
-mongosh mongodb://appuser:dbuser123@localhost:5001/myapp?authSource=admin
+mongosh mongodb://appuser:dbuser123@localhost:27017/myapp?authSource=admin
 ```
 
 #### Using MongoDB Compass
 
 1. Open MongoDB Compass
-2. Use connection string: `mongodb://appuser:dbuser123@localhost:5001/myapp?authSource=admin`
+2. Use connection string: `mongodb://appuser:dbuser123@localhost:27017/myapp?authSource=admin`
 
 ### Verifying Setup
 
 Check that collections exist:
 
 ```bash
-mongosh mongodb://appuser:dbuser123@localhost:5001/myapp?authSource=admin --eval "db.getCollectionNames()"
+mongosh mongodb://appuser:dbuser123@localhost:27017/myapp?authSource=admin --eval "db.getCollectionNames()"
 ```
 
 Expected output should include: `users`, `patients`, `doctors`, `consultations`, `medical_records`
@@ -203,7 +203,7 @@ docker exec healthcare_database mongorestore --uri="mongodb://appuser:dbuser123@
 **Problem:** Cannot connect to MongoDB
 **Solution:** 
 - Ensure the container is running: `docker ps | grep healthcare_database`
-- Check that port 5001 is not in use: `lsof -i :5001`
+- Check that port 27017 is not in use: `lsof -i :27017`
 - Verify credentials in the connection string
 
 **Problem:** Authentication failed
@@ -242,17 +242,17 @@ For production:
 ### Check Database Status
 
 ```bash
-mongosh mongodb://appuser:dbuser123@localhost:5001/myapp?authSource=admin --eval "db.serverStatus()"
+mongosh mongodb://appuser:dbuser123@localhost:27017/myapp?authSource=admin --eval "db.serverStatus()"
 ```
 
 ### View Collection Stats
 
 ```bash
-mongosh mongodb://appuser:dbuser123@localhost:5001/myapp?authSource=admin --eval "db.stats()"
+mongosh mongodb://appuser:dbuser123@localhost:27017/myapp?authSource=admin --eval "db.stats()"
 ```
 
 ### Monitor Connections
 
 ```bash
-mongosh mongodb://appuser:dbuser123@localhost:5001/myapp?authSource=admin --eval "db.serverStatus().connections"
+mongosh mongodb://appuser:dbuser123@localhost:27017/myapp?authSource=admin --eval "db.serverStatus().connections"
 ```

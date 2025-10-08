@@ -1,7 +1,7 @@
 {
   "database": "myapp",
   "connection_info": {
-    "url": "mongodb://appuser:dbuser123@localhost:5001/?authSource=admin",
+    "url": "mongodb://appuser:dbuser123@localhost:27017/?authSource=admin",
     "db": "myapp"
   },
   "collections": [
