@@ -154,3 +154,45 @@ echo "[startup] Database: ${DB_NAME}"
 echo "[startup] Port: ${DB_PORT}"
 echo "[startup] Auth enabled: ${ENABLE_AUTH}"
 echo "[startup] Logs: /var/lib/mongodb/mongod.log"
+
+# Start db_visualizer if Node.js is available
+# This section is resilient - if visualizer fails, MongoDB continues to run
+if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+    echo "[startup] Starting db_visualizer..."
+    
+    # Navigate to db_visualizer directory
+    cd db_visualizer || {
+        echo "[startup] WARNING: db_visualizer directory not found, skipping visualizer startup"
+        exit 0
+    }
+    
+    # Check if dependencies need to be installed or reinstalled
+    if [ ! -d "node_modules" ] || [ ! -d "node_modules/express/lib" ]; then
+        echo "[startup] Installing db_visualizer dependencies..."
+        # Use npm ci for clean install if package-lock exists, otherwise npm install
+        if npm ci 2>/dev/null; then
+            echo "[startup] Dependencies installed successfully with npm ci"
+        elif npm install 2>/dev/null; then
+            echo "[startup] Dependencies installed successfully with npm install"
+        else
+            echo "[startup] WARNING: Failed to install db_visualizer dependencies"
+            echo "[startup] MongoDB is running, but visualizer is unavailable"
+            exit 0
+        fi
+    else
+        echo "[startup] Dependencies already installed"
+    fi
+    
+    # Attempt to start the visualizer
+    # Use trap to handle errors gracefully
+    if npm start 2>&1; then
+        echo "[startup] db_visualizer started successfully"
+    else
+        echo "[startup] WARNING: db_visualizer failed to start"
+        echo "[startup] MongoDB continues to run on port ${DB_PORT}"
+        echo "[startup] You can connect directly using: mongosh mongodb://localhost:${DB_PORT}/${DB_NAME}"
+    fi
+else
+    echo "[startup] Node.js/npm not available, skipping db_visualizer startup"
+    echo "[startup] MongoDB is running and accessible on port ${DB_PORT}"
+fi
