@@ -260,11 +260,50 @@
         { "name": "patient_created_idx", "keys": { "patient_id": 1, "created_at": -1 }, "options": {}, "description": "Fetch latest records for a patient" },
         { "name": "title_description_text_idx", "keys": { "title": "text", "description": "text" }, "options": {}, "description": "Text search over titles and descriptions" }
       ]
+    },
+    {
+      "name": "tokens",
+      "description": "Authentication tokens/sessions for users (access/refresh tokens).",
+      "fields": {
+        "_id": { "type": "ObjectId", "generated": true, "description": "Primary identifier" },
+        "user_id": { "type": "ObjectId", "required": true, "ref": "users", "description": "Reference to users._id" },
+        "token": { "type": "string", "required": true, "description": "Opaque token or JWT string" },
+        "type": { "type": "string", "required": true, "enum": ["access", "refresh", "session"], "description": "Token category" },
+        "revoked": { "type": "boolean", "required": true, "default": false, "description": "If true, token is invalidated" },
+        "created_at": { "type": "date", "required": true, "default": "now", "description": "Creation timestamp" },
+        "last_used_at": { "type": "date", "required": false, "description": "Last usage" },
+        "expires_at": { "type": "date", "required": false, "description": "Token expiry timestamp (TTL candidate)" },
+        "ip": { "type": "string", "required": false, "description": "Client IP at issuance/last use" },
+        "user_agent": { "type": "string", "required": false, "description": "Client user agent" }
+      },
+      "validation": {
+        "$jsonSchema": {
+          "bsonType": "object",
+          "required": ["user_id", "token", "type", "revoked", "created_at"],
+          "properties": {
+            "user_id": { "bsonType": "objectId" },
+            "token": { "bsonType": "string", "minLength": 16 },
+            "type": { "enum": ["access", "refresh", "session"] },
+            "revoked": { "bsonType": "bool" },
+            "created_at": { "bsonType": "date" },
+            "last_used_at": { "bsonType": "date" },
+            "expires_at": { "bsonType": "date" },
+            "ip": { "bsonType": "string" },
+            "user_agent": { "bsonType": "string" }
+          }
+        }
+      },
+      "indexes": [
+        { "name": "uniq_token", "keys": { "token": 1 }, "options": { "unique": true }, "description": "Ensure tokens are unique" },
+        { "name": "user_type_idx", "keys": { "user_id": 1, "type": 1 }, "options": {}, "description": "Query tokens by user and type" },
+        { "name": "expires_ttl_idx", "keys": { "expires_at": 1 }, "options": { "expireAfterSeconds": 0 }, "description": "TTL index to auto-expire tokens on expires_at (requires applying in DB)" }
+      ]
     }
   ],
   "notes": [
     "This file documents intended collection structures, validation schemas, and indexes for the MongoDB database.",
     "To enforce these rules in MongoDB, apply the $jsonSchema validators and create indexes during initialization or via a migration script.",
-    "Object references are logical; MongoDB does not enforce foreign keys natively."
+    "Object references are logical; MongoDB does not enforce foreign keys natively.",
+    "For the tokens collection, apply a TTL index on expires_at in MongoDB to auto-expire tokens. The schema documents the intended index."
   ]
 }
