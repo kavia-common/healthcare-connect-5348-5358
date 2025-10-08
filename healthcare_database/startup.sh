@@ -1,59 +1,99 @@
 #!/bin/bash
-set -euo pipefail
 
-# Ensure script is executable and has a valid shebang for entrypoint execution.
-# MongoDB startup script aligned for previews (binds 0.0.0.0 on port 5001) and runs without-auth for readiness.
+# MongoDB startup script for port 5001 (preview mode)
+# Ensures MongoDB starts reliably and visualizer failures don't affect MongoDB
 DB_NAME="${DB_NAME:-myapp}"
 DB_USER="${DB_USER:-appuser}"
 DB_PASSWORD="${DB_PASSWORD:-dbuser123}"
-DB_PORT="${DB_PORT:-5001}"  # previews expect 5001
+DB_PORT="${DB_PORT:-5001}"
 DB_HOST="0.0.0.0"
 
-echo "[startup] Starting MongoDB setup (port ${DB_PORT})..."
+echo "════════════════════════════════════════════════════════"
+echo "[startup] MongoDB Startup Script"
+echo "[startup] Port: ${DB_PORT} | Database: ${DB_NAME}"
+echo "════════════════════════════════════════════════════════"
 
-# Ensure data and runtime directories exist with correct permissions
-# Avoid strict sudo dependency: try plain mkdir/chown, then fallback to sudo if present.
-mkdir -p /var/lib/mongodb /var/run/mongodb || { command -v sudo >/dev/null 2>&1 && sudo mkdir -p /var/lib/mongodb /var/run/mongodb || true; }
-chown -R "$(id -u):$(id -g)" /var/lib/mongodb /var/run/mongodb 2>/dev/null || { command -v sudo >/dev/null 2>&1 && sudo chown -R "$(whoami)":"$(whoami)" /var/lib/mongodb /var/run/mongodb || true; }
-chmod 700 /var/lib/mongodb 2>/dev/null || true
+# Function to log with timestamp
+log_info() {
+    echo "[startup $(date +%H:%M:%S)] INFO: $1"
+}
 
-# Remove stale lock/pid/socket files to avoid startup failures
+log_warn() {
+    echo "[startup $(date +%H:%M:%S)] WARN: $1"
+}
+
+log_error() {
+    echo "[startup $(date +%H:%M:%S)] ERROR: $1"
+}
+
+log_success() {
+    echo "[startup $(date +%H:%M:%S)] ✓ $1"
+}
+
+# Ensure required directories exist with correct permissions
+log_info "Setting up MongoDB directories..."
+mkdir -p /var/lib/mongodb /var/run/mongodb 2>/dev/null || {
+    if command -v sudo >/dev/null 2>&1; then
+        sudo mkdir -p /var/lib/mongodb /var/run/mongodb
+    else
+        log_error "Cannot create directories and sudo not available"
+        exit 1
+    fi
+}
+
+# Set ownership (best effort - may fail in some environments)
+chown -R "$(id -u):$(id -g)" /var/lib/mongodb /var/run/mongodb 2>/dev/null || {
+    if command -v sudo >/dev/null 2>&1; then
+        sudo chown -R "$(whoami)":"$(whoami)" /var/lib/mongodb /var/run/mongodb 2>/dev/null || true
+    fi
+}
+
+chmod 755 /var/lib/mongodb 2>/dev/null || true
+log_success "Directories prepared"
+
+# Remove stale lock files that could prevent startup
+log_info "Cleaning stale lock files..."
 rm -f /var/lib/mongodb/mongod.lock /var/lib/mongodb/*.pid 2>/dev/null || true
 rm -f /tmp/mongodb-*.sock 2>/dev/null || true
 
-# If already running and responding on desired port, print info and exit
+# Check if MongoDB is already running on the target port
+log_info "Checking for existing MongoDB instance..."
 if command -v mongosh >/dev/null 2>&1; then
-  if mongosh --port "${DB_PORT}" --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
-      echo "[startup] MongoDB is already running on port ${DB_PORT}!"
-      # Write best-effort connection files (no-auth for preview)
-      echo "mongosh mongodb://localhost:${DB_PORT}/${DB_NAME}" > db_connection.txt
-      cat > db_visualizer/mongodb.env << EOF
+    if mongosh --port "${DB_PORT}" --eval "db.adminCommand('ping')" >/dev/null 2>&1; then
+        log_success "MongoDB already running and responding on port ${DB_PORT}"
+        # Update connection files
+        echo "mongosh mongodb://localhost:${DB_PORT}/${DB_NAME}" > db_connection.txt
+        mkdir -p db_visualizer
+        cat > db_visualizer/mongodb.env << EOF
 export MONGODB_URL="mongodb://localhost:${DB_PORT}/"
 export MONGODB_DB="${DB_NAME}"
 EOF
-      exit 0
-  fi
-else
-  # If mongosh missing, try TCP to detect already-running instance
-  if (echo > /dev/tcp/127.0.0.1/${DB_PORT}) >/dev/null 2>&1; then
-      echo "[startup] MongoDB is already listening on port ${DB_PORT}."
-      echo "mongosh mongodb://localhost:${DB_PORT}/${DB_NAME}" > db_connection.txt
-      cat > db_visualizer/mongodb.env << EOF
+        log_success "Connection files updated"
+        exit 0
+    fi
+fi
+
+# TCP fallback check
+if (echo > /dev/tcp/127.0.0.1/${DB_PORT}) >/dev/null 2>&1; then
+    log_success "MongoDB already listening on port ${DB_PORT} (TCP check)"
+    echo "mongosh mongodb://localhost:${DB_PORT}/${DB_NAME}" > db_connection.txt
+    mkdir -p db_visualizer
+    cat > db_visualizer/mongodb.env << EOF
 export MONGODB_URL="mongodb://localhost:${DB_PORT}/"
 export MONGODB_DB="${DB_NAME}"
 EOF
-      exit 0
-  fi
+    exit 0
 fi
 
-# If mongod is running but not reachable on target port, best-effort stop to free it
-if pgrep -x mongod > /dev/null 2>&1; then
-    echo "[startup] mongod process detected; attempting to stop to free port ${DB_PORT}..."
-    pkill -x mongod 2>/dev/null || { command -v sudo >/dev/null 2>&1 && sudo pkill -x mongod || true; }
-    sleep 2
+# Check for lingering mongod processes that might block the port
+if pgrep -x mongod >/dev/null 2>&1; then
+    log_warn "Found existing mongod process, attempting cleanup..."
+    pkill -x mongod 2>/dev/null || sudo pkill -x mongod 2>/dev/null || true
+    sleep 3
 fi
 
-# Prepare an explicit inline config for preview (no-auth)
+# Create MongoDB configuration file
+log_info "Creating MongoDB configuration..."
 cat > mongod.conf << EOF
 storage:
   dbPath: /var/lib/mongodb
@@ -70,48 +110,74 @@ security:
   authorization: "disabled"
 EOF
 
-# Start MongoDB server binding to 0.0.0.0 on the expected port using nohup
-echo "[startup] Starting MongoDB server on ${DB_HOST}:${DB_PORT}..."
-nohup mongod --config "$(pwd)/mongod.conf" --unixSocketPrefix /var/run/mongodb >> /var/lib/mongodb/mongod.log 2>&1 &
+log_success "Configuration created"
 
-# Wait for MongoDB to start and respond
-echo "[startup] Waiting for MongoDB to start..."
+# Start MongoDB in background
+log_info "Starting MongoDB server on ${DB_HOST}:${DB_PORT}..."
+nohup mongod --config "$(pwd)/mongod.conf" --unixSocketPrefix /var/run/mongodb \
+    >> /var/lib/mongodb/mongod.log 2>&1 &
+MONGOD_PID=$!
+
+log_info "MongoDB started with PID ${MONGOD_PID}, waiting for readiness..."
+
+# Wait for MongoDB to become ready with multiple check methods
 ready=0
-for i in $(seq 1 60); do
-    # Prefer mongosh ping, else use TCP probe
+for attempt in $(seq 1 60); do
+    # Primary check: mongosh ping
     if command -v mongosh >/dev/null 2>&1; then
-      if mongosh --port "${DB_PORT}" --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
-          echo "[startup] MongoDB is ready on port ${DB_PORT}!"
-          ready=1
-          break
-      fi
+        if mongosh --port "${DB_PORT}" --eval "db.adminCommand('ping')" >/dev/null 2>&1; then
+            log_success "MongoDB is ready (mongosh ping succeeded)"
+            ready=1
+            break
+        fi
     fi
+    
+    # Fallback: TCP connection
     if (echo > /dev/tcp/127.0.0.1/${DB_PORT}) >/dev/null 2>&1; then
-        echo "[startup] MongoDB TCP port ${DB_PORT} is open."
+        log_success "MongoDB port ${DB_PORT} is responding (TCP check)"
         ready=1
         break
     fi
-    # As an additional hint, if ss is available, show listening sockets once
-    if [ "$i" -eq 5 ] && command -v ss >/dev/null 2>&1; then
-      ss -lnt | sed -n '1,50p' || true
+    
+    # Check if process is still alive
+    if ! kill -0 ${MONGOD_PID} 2>/dev/null; then
+        log_error "MongoDB process died during startup"
+        break
     fi
-    echo "[startup] Waiting... ($i/60)"
+    
+    # Show diagnostic info on attempt 5
+    if [ "${attempt}" -eq 5 ] && command -v ss >/dev/null 2>&1; then
+        log_info "Diagnostic: Listening ports..."
+        ss -tlnp 2>/dev/null | grep -E "LISTEN.*:${DB_PORT}" || echo "  Port ${DB_PORT} not yet bound"
+    fi
+    
+    echo "[startup] Waiting for MongoDB... (${attempt}/60)"
     sleep 1
 done
 
-# Final readiness check; exit with error if not ready
+# Final readiness verification
 if [ "${ready}" -ne 1 ]; then
-    echo "[startup] ERROR: MongoDB failed to start on port ${DB_PORT}."
-    echo "[startup] Tail of log:"
-    tail -n 200 /var/lib/mongodb/mongod.log || true
+    log_error "MongoDB failed to start on port ${DB_PORT} after 60 seconds"
+    log_error "─────────────────────────────────────────"
+    log_error "Troubleshooting hints:"
+    log_error "  1. Check if port ${DB_PORT} is already in use: ss -tlnp | grep ${DB_PORT}"
+    log_error "  2. Verify /var/lib/mongodb permissions: ls -la /var/lib/mongodb"
+    log_error "  3. Check logs: tail -100 /var/lib/mongodb/mongod.log"
+    log_error "  4. Ensure mongod binary is available: which mongod"
+    log_error "─────────────────────────────────────────"
+    
+    if [ -f /var/lib/mongodb/mongod.log ]; then
+        log_error "Last 50 lines of MongoDB log:"
+        tail -50 /var/lib/mongodb/mongod.log 2>/dev/null || sudo tail -50 /var/lib/mongodb/mongod.log 2>/dev/null || true
+    fi
     exit 1
 fi
 
-# Preview runners expect no-auth; skip user creation unless explicitly requested via ENABLE_AUTH=true
+# MongoDB is ready - now handle authentication if requested
 ENABLE_AUTH="${ENABLE_AUTH:-false}"
 if [ "${ENABLE_AUTH}" = "true" ] && command -v mongosh >/dev/null 2>&1; then
-  echo "[startup] Enabling auth and creating users as ENABLE_AUTH=true..."
-  mongosh --port "${DB_PORT}" << EOF
+    log_info "Creating MongoDB users (ENABLE_AUTH=true)..."
+    mongosh --port "${DB_PORT}" --quiet << EOF
 use admin
 if (db.getUser("${DB_USER}") == null) {
   db.createUser({
@@ -122,6 +188,7 @@ if (db.getUser("${DB_USER}") == null) {
       { role: "readWriteAnyDatabase", db: "admin" }
     ]
   });
+  print("Admin user created");
 }
 use ${DB_NAME}
 if (db.getUser("appuser") == null) {
@@ -130,69 +197,86 @@ if (db.getUser("appuser") == null) {
     pwd: "${DB_PASSWORD}",
     roles: [{ role: "readWrite", db: "${DB_NAME}" }]
   });
+  print("App user created");
 }
-print("MongoDB users created.");
 EOF
-  # Connection details with auth
-  echo "mongosh mongodb://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}?authSource=admin" > db_connection.txt
-  cat > db_visualizer/mongodb.env << EOF
+    
+    # Save authenticated connection details
+    echo "mongosh mongodb://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}?authSource=admin" > db_connection.txt
+    mkdir -p db_visualizer
+    cat > db_visualizer/mongodb.env << EOF
 export MONGODB_URL="mongodb://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/?authSource=admin"
 export MONGODB_DB="${DB_NAME}"
 EOF
+    log_success "Authentication enabled"
 else
-  echo "[startup] Running without authentication for preview readiness."
-  # Save connection details without auth
-  echo "mongosh mongodb://localhost:${DB_PORT}/${DB_NAME}" > db_connection.txt
-  cat > db_visualizer/mongodb.env << EOF
+    log_info "Running without authentication (preview mode)"
+    # Save non-authenticated connection details
+    echo "mongosh mongodb://localhost:${DB_PORT}/${DB_NAME}" > db_connection.txt
+    mkdir -p db_visualizer
+    cat > db_visualizer/mongodb.env << EOF
 export MONGODB_URL="mongodb://localhost:${DB_PORT}/"
 export MONGODB_DB="${DB_NAME}"
 EOF
 fi
 
-echo "[startup] MongoDB setup complete!"
-echo "[startup] Database: ${DB_NAME}"
-echo "[startup] Port: ${DB_PORT}"
-echo "[startup] Auth enabled: ${ENABLE_AUTH}"
-echo "[startup] Logs: /var/lib/mongodb/mongod.log"
+log_success "MongoDB setup complete!"
+echo "════════════════════════════════════════════════════════"
+echo "[startup] MongoDB Status:"
+echo "[startup]   - Database: ${DB_NAME}"
+echo "[startup]   - Port: ${DB_PORT}"
+echo "[startup]   - Host: ${DB_HOST}"
+echo "[startup]   - Auth: ${ENABLE_AUTH}"
+echo "[startup]   - Logs: /var/lib/mongodb/mongod.log"
+echo "[startup]   - Connection: $(cat db_connection.txt)"
+echo "════════════════════════════════════════════════════════"
 
-# Start db_visualizer if Node.js is available
-# This section is resilient - if visualizer fails, MongoDB continues to run
-if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
-    echo "[startup] Starting db_visualizer..."
-    
-    # Navigate to db_visualizer directory
-    cd db_visualizer || {
-        echo "[startup] WARNING: db_visualizer directory not found, skipping visualizer startup"
-        exit 0
-    }
-    
-    # Check if dependencies need to be installed or reinstalled
-    if [ ! -d "node_modules" ] || [ ! -d "node_modules/express/lib" ]; then
-        echo "[startup] Installing db_visualizer dependencies..."
-        # Use npm ci for clean install if package-lock exists, otherwise npm install
-        if npm ci 2>/dev/null; then
-            echo "[startup] Dependencies installed successfully with npm ci"
-        elif npm install 2>/dev/null; then
-            echo "[startup] Dependencies installed successfully with npm install"
-        else
-            echo "[startup] WARNING: Failed to install db_visualizer dependencies"
-            echo "[startup] MongoDB is running, but visualizer is unavailable"
-            exit 0
-        fi
-    else
-        echo "[startup] Dependencies already installed"
-    fi
-    
-    # Attempt to start the visualizer
-    # Use trap to handle errors gracefully
-    if npm start 2>&1; then
-        echo "[startup] db_visualizer started successfully"
-    else
-        echo "[startup] WARNING: db_visualizer failed to start"
-        echo "[startup] MongoDB continues to run on port ${DB_PORT}"
-        echo "[startup] You can connect directly using: mongosh mongodb://localhost:${DB_PORT}/${DB_NAME}"
-    fi
-else
-    echo "[startup] Node.js/npm not available, skipping db_visualizer startup"
-    echo "[startup] MongoDB is running and accessible on port ${DB_PORT}"
+# From this point on, errors should not stop MongoDB
+# Try to start db_visualizer but don't fail if it doesn't work
+log_info "Attempting to start db_visualizer (optional)..."
+
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+    log_warn "Node.js/npm not available - skipping visualizer"
+    log_info "MongoDB is accessible at: mongodb://localhost:${DB_PORT}/${DB_NAME}"
+    exit 0
 fi
+
+if [ ! -d "db_visualizer" ]; then
+    log_warn "db_visualizer directory not found - skipping"
+    exit 0
+fi
+
+cd db_visualizer || {
+    log_warn "Cannot access db_visualizer directory"
+    exit 0
+}
+
+# Check and install dependencies if needed
+if [ ! -d "node_modules" ] || [ ! -d "node_modules/express/lib" ]; then
+    log_info "Installing visualizer dependencies..."
+    if npm ci --silent >/dev/null 2>&1; then
+        log_success "Dependencies installed (npm ci)"
+    elif npm install --silent >/dev/null 2>&1; then
+        log_success "Dependencies installed (npm install)"
+    else
+        log_warn "Failed to install dependencies - visualizer unavailable"
+        log_info "MongoDB is running normally on port ${DB_PORT}"
+        exit 0
+    fi
+fi
+
+# Start visualizer in background (non-blocking)
+log_info "Starting visualizer in background..."
+nohup npm start >/dev/null 2>&1 &
+VISUALIZER_PID=$!
+
+# Brief check if visualizer started
+sleep 2
+if kill -0 ${VISUALIZER_PID} 2>/dev/null; then
+    log_success "db_visualizer started (PID: ${VISUALIZER_PID})"
+else
+    log_warn "db_visualizer failed to start, but MongoDB is running"
+fi
+
+log_info "Startup complete - MongoDB is ready on port ${DB_PORT}"
+exit 0
