@@ -1,0 +1,29 @@
+{
+  "description": "Index specifications for MongoDB collections in the healthcare database.",
+  "collections": {
+    "users": [
+      {
+        "keys": { "email": 1 },
+        "options": { "unique": true, "name": "uniq_users_email" }
+      }
+    ],
+    "doctors": [
+      {
+        "keys": { "specialty": 1 },
+        "options": { "name": "idx_doctors_specialty" }
+      }
+    ],
+    "consultations": [
+      {
+        "keys": { "patient_id": 1, "datetime": -1 },
+        "options": { "name": "idx_consultations_patient_datetime" }
+      }
+    ],
+    "medical_records": [
+      {
+        "keys": { "patient_id": 1, "created_at": -1 },
+        "options": { "name": "idx_medical_records_patient_created" }
+      }
+    ]
+  }
+}
